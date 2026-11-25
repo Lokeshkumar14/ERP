@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { SalesOrder, Customer } from '../types';
-import { Plus, Search, Filter, Printer, CheckCircle, Clock, Truck, ChevronRight } from 'lucide-react';
+import { Plus, Search, Filter, Printer, CheckCircle, Clock, Truck, ChevronRight, ChevronLeft, Layers } from 'lucide-react';
 
 interface SalesOrdersPageProps {
   onOpenCreateOrder: () => void;
+  onOpenCreateBatchForOrder?: (order: SalesOrder) => void;
   onPrintOrder?: (order: SalesOrder) => void;
 }
 
 export const SalesOrdersPage: React.FC<SalesOrdersPageProps> = ({
   onOpenCreateOrder,
+  onOpenCreateBatchForOrder,
   onPrintOrder,
 }) => {
   const [orders, setOrders] = useState<SalesOrder[]>([]);
@@ -17,6 +19,8 @@ export const SalesOrdersPage: React.FC<SalesOrdersPageProps> = ({
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 8;
 
   const fetchOrders = async () => {
     try {
@@ -53,6 +57,9 @@ export const SalesOrdersPage: React.FC<SalesOrdersPageProps> = ({
       (o.customer_name || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesStatus && matchesSearch;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const paginatedOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const getStatusColor = (status: string) => {
     const s = status.toLowerCase();
@@ -123,44 +130,99 @@ export const SalesOrdersPage: React.FC<SalesOrdersPageProps> = ({
                 <tr className="border-b border-slate-100 text-[11px] font-semibold text-slate-400">
                   <th className="pb-3">Order No</th>
                   <th className="pb-3">Customer</th>
-                  <th className="pb-3">Type</th>
-                  <th className="pb-3">Qty (KG)</th>
+                  <th className="pb-3">Order Qty</th>
+                  <th className="pb-3">Work Order Allocation</th>
                   <th className="pb-3">Amount</th>
                   <th className="pb-3">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filteredOrders.map((o) => (
-                  <tr
-                    key={o._id}
-                    onClick={() => setSelectedOrder(o)}
-                    className={`cursor-pointer transition hover:bg-slate-50/80 ${
-                      selectedOrder?._id === o._id ? 'bg-indigo-50/40' : ''
-                    }`}
-                  >
-                    <td className="py-3 font-bold text-indigo-600">{o.order_number}</td>
-                    <td className="py-3 font-semibold text-slate-800">{o.customer_name}</td>
-                    <td className="py-3">
-                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
-                        {o.order_type === 'made_to_order' ? 'MTO' : 'Stock'}
-                      </span>
-                    </td>
-                    <td className="py-3 font-medium text-slate-700">{o.total_quantity}</td>
-                    <td className="py-3 font-semibold text-slate-900">₹{o.grand_total.toLocaleString('en-IN')}</td>
-                    <td className="py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${getStatusColor(
-                          o.status
-                        )}`}
-                      >
-                        {o.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {paginatedOrders.map((o) => {
+                  const planned = o.planned_quantity || 0;
+                  const total = o.total_quantity || 1;
+                  const remaining = o.remaining_quantity !== undefined ? o.remaining_quantity : Math.max(0, total - planned);
+                  const pct = Math.min(100, Math.round((planned / total) * 100));
+
+                  return (
+                    <tr
+                      key={o._id}
+                      onClick={() => setSelectedOrder(o)}
+                      className={`cursor-pointer transition hover:bg-slate-50/80 ${
+                        selectedOrder?._id === o._id ? 'bg-indigo-50/40' : ''
+                      }`}
+                    >
+                      <td className="py-3 font-bold text-indigo-600">{o.order_number}</td>
+                      <td className="py-3 font-semibold text-slate-800">{o.customer_name}</td>
+                      <td className="py-3 font-medium text-slate-700">{o.total_quantity} KG</td>
+                      <td className="py-3">
+                        <div className="space-y-1 w-36">
+                          <div className="flex items-center justify-between text-[10px]">
+                            <span className="font-semibold text-slate-700">{planned} / {o.total_quantity} KG</span>
+                            <span className={`font-bold ${remaining > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                              {remaining > 0 ? `-${remaining} KG` : 'Full ✓'}
+                            </span>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-300 ${
+                                remaining <= 0 ? 'bg-emerald-500' : 'bg-indigo-600'
+                              }`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          {o.linked_work_orders && o.linked_work_orders.length > 0 && (
+                            <div className="text-[10px] text-slate-400 truncate">
+                              {o.linked_work_orders.map((w) => w.batch_number).join(', ')}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 font-semibold text-slate-900">₹{o.grand_total.toLocaleString('en-IN')}</td>
+                      <td className="py-3">
+                        <span
+                          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${getStatusColor(
+                            o.status
+                          )}`}
+                        >
+                          {o.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls */}
+          {filteredOrders.length > pageSize && (
+            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
+              <span>
+                Showing <strong>{((currentPage - 1) * pageSize) + 1}</strong> to{' '}
+                <strong>{Math.min(currentPage * pageSize, filteredOrders.length)}</strong> of{' '}
+                <strong>{filteredOrders.length}</strong> orders
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="rounded-lg border border-slate-200 p-1 hover:bg-slate-50 disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="px-2 font-semibold text-slate-700">
+                  {currentPage} / {totalPages}
+                </span>
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="rounded-lg border border-slate-200 p-1 hover:bg-slate-50 disabled:opacity-40"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Selected Order Detail Panel (5 cols) */}
@@ -196,6 +258,101 @@ export const SalesOrdersPage: React.FC<SalesOrdersPageProps> = ({
                   <span className="text-[10px] text-slate-400 block">Delivery Date</span>
                   <span className="font-semibold text-slate-800">{selectedOrder.required_delivery_date || 'N/A'}</span>
                 </div>
+              </div>
+
+              {/* Work Order Fulfillment & Multi-Work Order Splitting */}
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-900 text-xs">
+                    <Layers className="h-4 w-4 text-indigo-600" />
+                    <span>Production Allocation</span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                      (selectedOrder.remaining_quantity ?? selectedOrder.total_quantity) > 0
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-emerald-100 text-emerald-800'
+                    }`}
+                  >
+                    {(selectedOrder.remaining_quantity ?? selectedOrder.total_quantity) > 0
+                      ? `${selectedOrder.remaining_quantity} KG Remaining`
+                      : 'Fully Planned ✓'}
+                  </span>
+                </div>
+
+                {/* Progress bar */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[11px] text-slate-600">
+                    <span>
+                      Planned: <strong>{selectedOrder.planned_quantity || 0} KG</strong> of {selectedOrder.total_quantity} KG
+                    </span>
+                    <span className="font-semibold text-indigo-700">
+                      {Math.min(100, Math.round(((selectedOrder.planned_quantity || 0) / (selectedOrder.total_quantity || 1)) * 100))}%
+                    </span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-slate-200/80 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        (selectedOrder.remaining_quantity ?? selectedOrder.total_quantity) <= 0
+                          ? 'bg-emerald-500'
+                          : 'bg-indigo-600'
+                      }`}
+                      style={{
+                        width: `${Math.min(100, Math.round(((selectedOrder.planned_quantity || 0) / (selectedOrder.total_quantity || 1)) * 100))}%`
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Linked Work Orders list */}
+                {selectedOrder.linked_work_orders && selectedOrder.linked_work_orders.length > 0 ? (
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                      Active Work Orders for this Order ({selectedOrder.linked_work_orders.length}):
+                    </span>
+                    <div className="space-y-1">
+                      {selectedOrder.linked_work_orders.map((wo) => (
+                        <div
+                          key={wo.batch_number}
+                          className="flex items-center justify-between rounded-lg bg-white p-2 border border-slate-200/80 text-xs shadow-2xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-indigo-700 font-mono">{wo.batch_number}</span>
+                            <span className="text-slate-700 font-medium">{wo.planned_quantity} KG</span>
+                            <span className="text-slate-400">({wo.fabric_name})</span>
+                          </div>
+                          <span className="rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 capitalize">
+                            {wo.current_process}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-500 italic">
+                    No work orders issued yet for this order.
+                  </p>
+                )}
+
+                {/* Direct Action Button to Create Work Order (Only shown if pending quantity remains) */}
+                {onOpenCreateBatchForOrder && (
+                  (selectedOrder.remaining_quantity ?? selectedOrder.total_quantity) > 0 ? (
+                    <button
+                      onClick={() => onOpenCreateBatchForOrder(selectedOrder)}
+                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 transition"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>
+                        + Create Work Order for Remaining {selectedOrder.remaining_quantity} KG
+                      </span>
+                    </button>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2 rounded-xl bg-emerald-50 py-2.5 px-3 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                      <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span>Order 100% Planned ({selectedOrder.total_quantity} KG) — No further work orders allowed</span>
+                    </div>
+                  )
+                )}
               </div>
 
               {/* Workflow Stepper */}

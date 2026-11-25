@@ -100,6 +100,14 @@ export const CreatePartyModal: React.FC<CreatePartyModalProps> = ({
       });
       onSuccess();
       onClose();
+      setName('');
+      setPartyCode('');
+      setGstin('');
+      setContactPerson('');
+      setPhone('');
+      setEmail('');
+      setStreet('');
+      setOpeningBalance(0);
     } catch (err) {
       alert(`Failed to create party: ${err}`);
     } finally {

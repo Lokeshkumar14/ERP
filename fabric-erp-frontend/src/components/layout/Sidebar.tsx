@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   LayoutDashboard,
   Package,
-  ShieldCheck,
   ShoppingCart,
   Layers,
   CircleDollarSign,
@@ -144,7 +143,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       isActive('rolls') ? 'text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    Fabric Rolls & Lineage
+                    Finished Fabric Stock
                   </button>
                   <button
                     onClick={() => handleNavClick('godowns')}
@@ -157,19 +156,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               )}
             </div>
-
-            {/* Quality Control */}
-            <button
-              onClick={() => handleNavClick('quality')}
-              className={`flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 transition text-left ${
-                isActive('quality')
-                  ? 'bg-indigo-50 text-indigo-600 font-semibold shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <ShieldCheck className="h-4 w-4 shrink-0" />
-              <span>Quality Control</span>
-            </button>
 
             {/* Sales and Order */}
             <div>
@@ -246,12 +232,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {jobWorkOpen && (
                 <div className="ml-7 mt-1 space-y-1 border-l-2 border-slate-100 pl-3">
                   <button
-                    onClick={() => handleNavClick('job_work')}
+                    onClick={() => handleNavClick('work_orders')}
                     className={`block w-full py-1 text-left text-xs transition ${
-                      isActive('job_work') ? 'text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-800'
+                      isActive('work_orders') || isActive('job_work') || isActive('job_orders') ? 'text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    Batches & Orders
+                    Work Orders & Processing
                   </button>
                   <button
                     onClick={() => handleNavClick('parties')}
@@ -306,7 +292,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       isActive('costing') ? 'text-indigo-600 font-semibold' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    Batch Costing
+                    Work Order Costing
                   </button>
                 </div>
               )}

@@ -19,6 +19,50 @@ async def list_sales_orders(status: Optional[str] = None, customer_id: Optional[
         query["customer_id"] = customer_id
     cursor = await col.find(query)
     orders = await cursor.to_list()
+
+    # Aggregate linked work orders to compute planned & remaining quantities
+    batches_col = db.get_collection("production_batches")
+    all_batches = await (await batches_col.find({})).to_list()
+    batches_by_order: Dict[str, List[Dict[str, Any]]] = {}
+    for b in all_batches:
+        s_id = str(b.get("source_order_id") or "")
+        s_num = str(b.get("source_order_number") or "")
+        b_summary = {
+            "batch_id": str(b.get("_id")),
+            "batch_number": b.get("batch_number"),
+            "fabric_name": b.get("fabric_name"),
+            "colour": b.get("colour"),
+            "gsm": b.get("gsm"),
+            "planned_quantity": float(b.get("planned_quantity", 0.0)),
+            "completed_quantity": float(b.get("completed_quantity", 0.0)),
+            "current_process": b.get("current_process", "knitting"),
+            "status": b.get("status", "in_progress")
+        }
+        if s_id:
+            batches_by_order.setdefault(s_id, []).append(b_summary)
+        if s_num:
+            batches_by_order.setdefault(s_num, []).append(b_summary)
+
+    for o in orders:
+        oid = str(o.get("_id"))
+        onum = str(o.get("order_number"))
+        linked = batches_by_order.get(oid, []) + batches_by_order.get(onum, [])
+        seen = set()
+        unique_linked = []
+        planned_total = 0.0
+        for l in linked:
+            b_num = l["batch_number"]
+            if b_num not in seen:
+                seen.add(b_num)
+                unique_linked.append(l)
+                planned_total += l["planned_quantity"]
+
+        tot_qty = float(o.get("total_quantity", 0.0))
+        rem_qty = max(0.0, round(tot_qty - planned_total, 2))
+        o["planned_quantity"] = round(planned_total, 2)
+        o["remaining_quantity"] = rem_qty
+        o["linked_work_orders"] = unique_linked
+
     # Sort descending by date
     orders.sort(key=lambda x: str(x.get("created_at", "")), reverse=True)
     return orders
@@ -86,6 +130,37 @@ async def get_sales_order(order_id: str, current_user: Dict[str, Any] = Depends(
         doc = await db.get_collection("sales_orders").find_one({"order_number": order_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Sales Order not found")
+
+    batches_col = db.get_collection("production_batches")
+    oid = str(doc.get("_id"))
+    onum = str(doc.get("order_number"))
+    cursor = await batches_col.find({"$or": [{"source_order_id": oid}, {"source_order_number": onum}]})
+    batches = await cursor.to_list()
+    
+    unique_linked = []
+    seen = set()
+    planned_total = 0.0
+    for b in batches:
+        b_num = b.get("batch_number")
+        if b_num not in seen:
+            seen.add(b_num)
+            planned_total += float(b.get("planned_quantity", 0.0))
+            unique_linked.append({
+                "batch_id": str(b.get("_id")),
+                "batch_number": b_num,
+                "fabric_name": b.get("fabric_name"),
+                "colour": b.get("colour"),
+                "gsm": b.get("gsm"),
+                "planned_quantity": float(b.get("planned_quantity", 0.0)),
+                "completed_quantity": float(b.get("completed_quantity", 0.0)),
+                "current_process": b.get("current_process", "knitting"),
+                "status": b.get("status", "in_progress")
+            })
+
+    tot_qty = float(doc.get("total_quantity", 0.0))
+    doc["planned_quantity"] = round(planned_total, 2)
+    doc["remaining_quantity"] = max(0.0, round(tot_qty - planned_total, 2))
+    doc["linked_work_orders"] = unique_linked
     return doc
 
 @router.patch("/{order_id}/status")

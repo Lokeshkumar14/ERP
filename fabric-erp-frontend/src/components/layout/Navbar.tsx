@@ -72,6 +72,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                 + Sales Order
               </button>
               <button
+                onClick={() => { onOpenQuickAction('batch'); setShowQuickAdd(false); }}
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-600"
+              >
+                + Work Order
+              </button>
+              <button
                 onClick={() => { onOpenQuickAction('yarn_po'); setShowQuickAdd(false); }}
                 className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-600"
               >
@@ -82,12 +88,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-600"
               >
                 + Issue Job Work Order
-              </button>
-              <button
-                onClick={() => { onOpenQuickAction('qc_inspection'); setShowQuickAdd(false); }}
-                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-600"
-              >
-                + Quality Inspection
               </button>
               <button
                 onClick={() => { onOpenQuickAction('delivery_challan'); setShowQuickAdd(false); }}

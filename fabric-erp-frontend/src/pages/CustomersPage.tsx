@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { Customer } from '../types';
-import { Plus, Users, Phone, Mail, MapPin, BookOpen, Tag, History, Printer, X } from 'lucide-react';
+import { Plus, Users, Phone, Mail, MapPin, BookOpen, Tag, History, Printer, X, Trash2, Check, AlertCircle, Loader2 } from 'lucide-react';
 
 interface CustomersPageProps {
   onOpenCreateCustomer: () => void;
@@ -19,7 +19,9 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ onOpenCreateCustom
   // Price List form
   const [specialFabric, setSpecialFabric] = useState('Single Jersey');
   const [specialColour, setSpecialColour] = useState('Black');
-  const [specialRate, setSpecialRate] = useState(340);
+  const [specialRate, setSpecialRate] = useState<string | number>('340');
+  const [savingRate, setSavingRate] = useState(false);
+  const [rateFeedback, setRateFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const fetchCustomers = async () => {
     try {
@@ -63,17 +65,43 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ onOpenCreateCustom
 
   const handleSavePrice = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCustomerId) return;
+    if (!selectedCustomerId) {
+      setRateFeedback({ type: 'error', text: 'Please select a customer first.' });
+      return;
+    }
+    const parsedRate = parseFloat(String(specialRate));
+    if (isNaN(parsedRate) || parsedRate <= 0) {
+      setRateFeedback({ type: 'error', text: 'Please enter a valid rate greater than 0.' });
+      return;
+    }
     try {
+      setSavingRate(true);
+      setRateFeedback(null);
       await api.setCustomerPrice(selectedCustomerId, {
-        fabric_name: specialFabric,
-        colour: specialColour,
-        special_rate: specialRate,
+        fabric_name: specialFabric.trim(),
+        colour: specialColour.trim(),
+        special_rate: parsedRate,
       });
-      loadCustomerDetails(selectedCustomerId);
-      alert('Special customer rate saved successfully!');
-    } catch (err) {
-      alert(`Error saving rate: ${err}`);
+      await loadCustomerDetails(selectedCustomerId);
+      setRateFeedback({ type: 'success', text: `Saved ₹${parsedRate.toFixed(2)}/KG for ${specialFabric} (${specialColour})` });
+      setTimeout(() => setRateFeedback(null), 4000);
+    } catch (err: any) {
+      console.error('Save rate failed:', err);
+      setRateFeedback({ type: 'error', text: err?.message || 'Failed to save customer rate. Please check backend connection.' });
+    } finally {
+      setSavingRate(false);
+    }
+  };
+
+  const handleDeletePrice = async (priceId: string) => {
+    if (!confirm('Remove this custom rate?')) return;
+    try {
+      await api.deleteCustomerPrice(selectedCustomerId, priceId);
+      await loadCustomerDetails(selectedCustomerId);
+      setRateFeedback({ type: 'success', text: 'Rate removed successfully.' });
+      setTimeout(() => setRateFeedback(null), 3000);
+    } catch (err: any) {
+      alert(`Error removing rate: ${err?.message || err}`);
     }
   };
 
@@ -199,91 +227,181 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ onOpenCreateCustom
       {/* Tab 2: Customer Price Lists */}
       {activeTab === 'pricing' && (
         <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900">Customer-Specific Fabric Price Lists</h3>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-slate-500">Customer:</label>
-              <select
-                value={selectedCustomerId}
-                onChange={(e) => handleSelectCustomer(e.target.value)}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold"
-              >
-                {customers.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name} ({c.customer_code})
-                  </option>
-                ))}
-              </select>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Customer-Specific Fabric Price Lists</h3>
+              <p className="text-xs text-slate-500">Configure special contract rates per KG agreed for specific fabric structures and colours.</p>
             </div>
+            {customers.length > 0 ? (
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-600">Customer:</label>
+                <select
+                  value={selectedCustomerId}
+                  onChange={(e) => handleSelectCustomer(e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {customers.map((c) => (
+                    <option key={c._id} value={c._id}>
+                      {c.name} ({c.customer_code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
           </div>
 
-          <form onSubmit={handleSavePrice} className="grid grid-cols-1 sm:grid-cols-4 gap-3 rounded-xl bg-indigo-50/40 p-4 text-xs">
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Fabric Structure</label>
-              <input
-                type="text"
-                required
-                value={specialFabric}
-                onChange={(e) => setSpecialFabric(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 p-2 bg-white"
-              />
-            </div>
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Colour / Shade</label>
-              <input
-                type="text"
-                required
-                value={specialColour}
-                onChange={(e) => setSpecialColour(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 p-2 bg-white"
-              />
-            </div>
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Contract Rate (₹/KG)</label>
-              <input
-                type="number"
-                required
-                value={specialRate}
-                onChange={(e) => setSpecialRate(parseFloat(e.target.value) || 0)}
-                className="w-full rounded-lg border border-slate-200 p-2 bg-white font-bold text-indigo-700"
-              />
-            </div>
-            <div className="flex items-end">
+          {customers.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center bg-slate-50">
+              <Users className="mx-auto h-8 w-8 text-slate-400 mb-2" />
+              <p className="text-sm font-semibold text-slate-700">No Customers Added Yet</p>
+              <p className="text-xs text-slate-500 mt-1 mb-4">Please add a customer first to manage contract price lists.</p>
               <button
-                type="submit"
-                className="w-full rounded-lg bg-indigo-600 py-2 font-semibold text-white hover:bg-indigo-700"
+                onClick={onOpenCreateCustomer}
+                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700"
               >
-                Save Contract Rate
+                <Plus className="h-4 w-4" /> Add First Customer
               </button>
             </div>
-          </form>
+          ) : (
+            <>
+              {rateFeedback && (
+                <div
+                  className={`flex items-center gap-2 p-3 rounded-xl text-xs font-medium ${
+                    rateFeedback.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
+                  }`}
+                >
+                  {rateFeedback.type === 'success' ? (
+                    <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                  )}
+                  <span>{rateFeedback.text}</span>
+                </div>
+              )}
 
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-slate-100 text-[11px] font-semibold text-slate-400">
-                <th className="pb-3">Customer</th>
-                <th className="pb-3">Fabric</th>
-                <th className="pb-3">Colour</th>
-                <th className="pb-3">Special Agreed Rate (₹/KG)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              <tr className="hover:bg-slate-50/60">
-                <td className="py-3 font-semibold text-slate-900">{selectedCust?.name}</td>
-                <td className="py-3 font-medium text-slate-800">Single Jersey</td>
-                <td className="py-3 text-slate-600">Black</td>
-                <td className="py-3 font-bold text-indigo-600">₹340.00 / KG (Standard: ₹350)</td>
-              </tr>
-              {priceList.map((p, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/60">
-                  <td className="py-3 font-semibold text-slate-900">{selectedCust?.name}</td>
-                  <td className="py-3 font-medium text-slate-800">{p.fabric_name}</td>
-                  <td className="py-3 text-slate-600">{p.colour}</td>
-                  <td className="py-3 font-bold text-indigo-600">₹{p.special_rate}.00 / KG</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              <form onSubmit={handleSavePrice} className="grid grid-cols-1 sm:grid-cols-4 gap-3 rounded-xl bg-indigo-50/50 border border-indigo-100 p-4 text-xs">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Fabric Structure</label>
+                  <input
+                    type="text"
+                    required
+                    list="fabric-structures"
+                    value={specialFabric}
+                    onChange={(e) => setSpecialFabric(e.target.value)}
+                    placeholder="e.g. Single Jersey"
+                    className="w-full rounded-lg border border-slate-200 p-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <datalist id="fabric-structures">
+                    <option value="Single Jersey" />
+                    <option value="French Terry" />
+                    <option value="Loop Knit" />
+                    <option value="Rib 1x1" />
+                    <option value="Fleece" />
+                    <option value="Interlock" />
+                    <option value="Pique" />
+                  </datalist>
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Colour / Shade</label>
+                  <input
+                    type="text"
+                    required
+                    list="colour-shades"
+                    value={specialColour}
+                    onChange={(e) => setSpecialColour(e.target.value)}
+                    placeholder="e.g. Black"
+                    className="w-full rounded-lg border border-slate-200 p-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <datalist id="colour-shades">
+                    <option value="Black" />
+                    <option value="White" />
+                    <option value="Navy Blue" />
+                    <option value="Grey Melange" />
+                    <option value="Royal Blue" />
+                    <option value="Red" />
+                    <option value="Olive Green" />
+                  </datalist>
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Contract Rate (₹/KG)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    value={specialRate}
+                    onChange={(e) => setSpecialRate(e.target.value)}
+                    placeholder="340.00"
+                    className="w-full rounded-lg border border-slate-200 p-2 bg-white font-bold text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <button
+                    type="submit"
+                    disabled={savingRate}
+                    className="w-full rounded-lg bg-indigo-600 py-2.5 font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2 shadow-xs transition"
+                  >
+                    {savingRate ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Saving...
+                      </>
+                    ) : (
+                      'Save Contract Rate'
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-[11px] font-semibold text-slate-400">
+                      <th className="pb-3">Customer</th>
+                      <th className="pb-3">Fabric Structure</th>
+                      <th className="pb-3">Colour / Shade</th>
+                      <th className="pb-3">Agreed Special Rate</th>
+                      <th className="pb-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {priceList.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-slate-400">
+                          No custom agreed rates set for {selectedCust?.name || 'this customer'} yet. Fill the form above to add one.
+                        </td>
+                      </tr>
+                    ) : (
+                      priceList.map((p, idx) => (
+                        <tr key={p._id || idx} className="hover:bg-slate-50/60 transition">
+                          <td className="py-3 font-semibold text-slate-900">{selectedCust?.name || p.customer_name}</td>
+                          <td className="py-3 font-medium text-slate-800">{p.fabric_name}</td>
+                          <td className="py-3 text-slate-600">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 font-medium text-slate-700">
+                              {p.colour}
+                            </span>
+                          </td>
+                          <td className="py-3 font-bold text-indigo-600 text-sm">
+                            ₹{Number(p.special_rate).toFixed(2)} <span className="text-[11px] font-normal text-slate-500">/ KG</span>
+                          </td>
+                          <td className="py-3 text-right">
+                            {p._id ? (
+                              <button
+                                onClick={() => handleDeletePrice(p._id)}
+                                title="Remove rate"
+                                className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 

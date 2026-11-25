@@ -270,7 +270,7 @@ async def seed_initial_data():
         {
             "_id": "roll_01",
             "roll_number": "ROLL-1001",
-            "batch_number": "BATCH-1001",
+            "batch_number": "WO-1001",
             "fabric_name": "Single Jersey",
             "gsm": 160.0,
             "width": 72.0,
@@ -286,7 +286,7 @@ async def seed_initial_data():
         {
             "_id": "roll_02",
             "roll_number": "ROLL-1002",
-            "batch_number": "BATCH-1001",
+            "batch_number": "WO-1001",
             "fabric_name": "Single Jersey",
             "gsm": 160.0,
             "width": 72.0,
@@ -302,7 +302,7 @@ async def seed_initial_data():
         {
             "_id": "roll_03",
             "roll_number": "ROLL-1003",
-            "batch_number": "BATCH-1002",
+            "batch_number": "WO-1002",
             "fabric_name": "French Terry",
             "gsm": 240.0,
             "width": 72.0,
@@ -318,7 +318,7 @@ async def seed_initial_data():
         {
             "_id": "roll_04",
             "roll_number": "ROLL-1004",
-            "batch_number": "BATCH-1002",
+            "batch_number": "WO-1002",
             "fabric_name": "French Terry",
             "gsm": 240.0,
             "width": 72.0,
@@ -449,7 +449,7 @@ async def seed_initial_data():
     batches = [
         {
             "_id": "batch_01",
-            "batch_number": "BATCH-1001",
+            "batch_number": "WO-1001",
             "source_type": "sales_order",
             "source_order_id": "so_01",
             "source_order_number": "SO-2001",
@@ -466,7 +466,7 @@ async def seed_initial_data():
         },
         {
             "_id": "batch_02",
-            "batch_number": "BATCH-1002",
+            "batch_number": "WO-1002",
             "source_type": "stock_production",
             "fabric_name": "French Terry",
             "colour": "Navy Blue",

@@ -47,23 +47,23 @@ export const CostingPage: React.FC = () => {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-          Batch Costing & Order Profitability
+          Work Order Costing & Order Profitability
         </h1>
         <p className="text-xs text-slate-500">
           Traceable cost accumulation (Yarn raw materials, knitting, washing, compacting, finishing & transport)
         </p>
       </div>
 
-      {/* Batch Costing Engine Breakdown */}
+      {/* Work Order Costing Engine Breakdown */}
       <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
             <Layers className="h-4 w-4 text-indigo-600" />
-            <h3 className="text-sm font-bold text-slate-900">Production Batch Cost Accumulation</h3>
+            <h3 className="text-sm font-bold text-slate-900">Production Work Order Cost Accumulation</h3>
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-xs text-slate-500">Select Production Batch:</label>
+            <label className="text-xs text-slate-500">Select Work Order:</label>
             <select
               value={selectedBatchId}
               onChange={(e) => handleBatchSelect(e.target.value)}

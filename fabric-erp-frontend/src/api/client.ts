@@ -1,7 +1,12 @@
 const BASE_URL = '/api/v1';
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('token');
+  let token = localStorage.getItem('token');
+  if (token === 'null' || token === 'undefined') {
+    localStorage.removeItem('token');
+    token = null;
+  }
+
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -14,6 +19,10 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
     const errorData = await response.json().catch(() => ({}));
     throw new Error(errorData.detail || errorData.message || `Request failed with status ${response.status}`);
   }
@@ -37,6 +46,7 @@ export const api = {
   getCustomerHistory: (id: string) => request<any>(`/customers/${id}/history`),
   setCustomerPrice: (id: string, data: any) => request<any>(`/customers/${id}/price-list`, { method: 'POST', body: JSON.stringify(data) }),
   getCustomerPriceList: (id: string) => request<any[]>(`/customers/${id}/price-list`),
+  deleteCustomerPrice: (customerId: string, priceId: string) => request<any>(`/customers/${customerId}/price-list/${priceId}`, { method: 'DELETE' }),
 
   // Parties (Suppliers & Job Workers)
   getParties: (type?: string, service?: string) => {

@@ -186,6 +186,9 @@ class SalesOrderResponse(SalesOrderCreate):
     grand_total: float = 0.0
     status: str = "confirmed"  # Draft, Confirmed, Planning, In Production, Partially Ready, Ready for Delivery, Partially Delivered, Completed, Cancelled
     created_at: Optional[str] = None
+    planned_quantity: Optional[float] = 0.0
+    remaining_quantity: Optional[float] = 0.0
+    linked_work_orders: Optional[List[Dict[str, Any]]] = []
 
     class Config:
         populate_by_name = True
@@ -264,6 +267,8 @@ class ProductionBatchResponse(ProductionBatchCreate):
     completed_quantity: Optional[float] = 0.0
     total_cost: Optional[float] = 0.0
     created_at: Optional[str] = None
+    stage_progress: Optional[List[Dict[str, Any]]] = []
+    ready_for_next_stage: Optional[Dict[str, Any]] = None
 
     class Config:
         populate_by_name = True

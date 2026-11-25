@@ -20,13 +20,14 @@ async def list_deliveries(customer_id: Optional[str] = None, current_user: Dict[
 @router.post("")
 async def create_sales_delivery(payload: Dict[str, Any], current_user: Dict[str, Any] = Depends(get_current_user)):
     order_id = payload.get("sales_order_id")
+    quantity_kg = float(payload.get("quantity_kg", 0.0) or 0.0)
     roll_ids = payload.get("roll_ids", [])
     transporter = payload.get("transporter", "")
     vehicle_number = payload.get("vehicle_number", "")
     eway_bill = payload.get("eway_bill_number", "")
 
-    if not order_id or not roll_ids:
-        raise HTTPException(status_code=400, detail="Sales order ID and roll IDs are required")
+    if not order_id:
+        raise HTTPException(status_code=400, detail="Sales order ID is required")
 
     db = get_database()
     orders_col = db.get_collection("sales_orders")
@@ -34,36 +35,47 @@ async def create_sales_delivery(payload: Dict[str, Any], current_user: Dict[str,
     if not order:
         raise HTTPException(status_code=404, detail="Sales Order not found")
 
-    rolls_col = db.get_collection("fabric_rolls")
-    rolls_to_dispatch = []
-    total_delivered_weight = 0.0
+    total_delivered_weight = quantity_kg
     roll_numbers = []
 
-    for rid in roll_ids:
-        r = await rolls_col.find_one({"_id": rid})
-        if not r:
-            raise HTTPException(status_code=404, detail=f"Roll {rid} not found")
-        if r.get("is_delivered"):
-            raise HTTPException(status_code=400, detail=f"Roll {r.get('roll_number')} is already marked as delivered!")
-        if r.get("quality_status") == "rejected":
-            raise HTTPException(status_code=400, detail=f"Roll {r.get('roll_number')} is rejected by QC and cannot be dispatched!")
-        
-        rolls_to_dispatch.append(r)
-        total_delivered_weight += r.get("current_weight", 0.0)
-        roll_numbers.append(r.get("roll_number"))
-
-    # Mark rolls as delivered
-    for rid in roll_ids:
-        await rolls_col.update_one(
-            {"_id": rid},
-            {
-                "$set": {
-                    "is_delivered": True,
-                    "delivered_at": datetime.utcnow().strftime("%Y-%m-%d"),
-                    "delivered_to_customer": order.get("customer_name")
-                }
-            }
-        )
+    # If roll_ids are provided, update them and compute weight if not explicitly passed
+    rolls_col = db.get_collection("fabric_rolls")
+    if roll_ids:
+        rolls_to_dispatch = []
+        calc_weight = 0.0
+        for rid in roll_ids:
+            r = await rolls_col.find_one({"_id": rid})
+            if r:
+                rolls_to_dispatch.append(r)
+                calc_weight += r.get("current_weight", 0.0)
+                if r.get("roll_number"):
+                    roll_numbers.append(r.get("roll_number"))
+                await rolls_col.update_one(
+                    {"_id": rid},
+                    {
+                        "$set": {
+                            "is_delivered": True,
+                            "delivered_at": datetime.utcnow().strftime("%Y-%m-%d"),
+                            "delivered_to_customer": order.get("customer_name")
+                        }
+                    }
+                )
+        if total_delivered_weight <= 0.0:
+            total_delivered_weight = calc_weight
+    else:
+        # Deduct weight directly from available finished fabric stock if available
+        rem_to_deduct = total_delivered_weight
+        finished_stock = await (await rolls_col.find({"current_process": "finished", "is_delivered": False})).to_list()
+        for stk in finished_stock:
+            curr = stk.get("current_weight", 0.0)
+            if curr <= rem_to_deduct:
+                await rolls_col.update_one({"_id": stk["_id"]}, {"$set": {"is_delivered": True, "current_weight": 0.0}})
+                rem_to_deduct -= curr
+            else:
+                await rolls_col.update_one({"_id": stk["_id"]}, {"$set": {"current_weight": curr - rem_to_deduct}})
+                rem_to_deduct = 0.0
+            if rem_to_deduct <= 0:
+                break
 
     # Generate Delivery Challan
     dc_num = await get_next_sequence("dc_number", prefix="DC-")

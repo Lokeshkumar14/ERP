@@ -67,6 +67,17 @@ export const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({
       });
       onSuccess();
       onClose();
+      setName('');
+      setCustomerCode('');
+      setContactPerson('');
+      setPhone('');
+      setEmail('');
+      setGstin('');
+      setPan('');
+      setStreet('');
+      setCreditLimit(500000);
+      setCreditDays(30);
+      setOpeningBalance(0);
     } catch (err) {
       alert(`Failed to create customer: ${err}`);
     } finally {

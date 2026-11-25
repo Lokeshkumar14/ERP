@@ -77,8 +77,8 @@ export const PrintableChallan: React.FC<PrintableChallanProps> = ({ challan, onC
               <tr>
                 <th className="p-2.5">S.No</th>
                 <th className="p-2.5">Material Description</th>
-                <th className="p-2.5">Roll Numbers</th>
-                <th className="p-2.5 text-right">Quantity</th>
+                <th className="p-2.5">Lot / Specification</th>
+                <th className="p-2.5 text-right">Dispatched Quantity</th>
               </tr>
             </thead>
             <tbody>
@@ -86,10 +86,10 @@ export const PrintableChallan: React.FC<PrintableChallanProps> = ({ challan, onC
                 <td className="p-2.5">1</td>
                 <td className="p-2.5 font-semibold text-slate-900">{challan.item_description}</td>
                 <td className="p-2.5 text-[11px] font-mono text-slate-600">
-                  {challan.roll_numbers?.join(', ') || 'N/A'}
+                  {challan.roll_numbers && challan.roll_numbers.length > 0 ? challan.roll_numbers.join(', ') : (challan.reference_order_number || 'Standard Weight')}
                 </td>
                 <td className="p-2.5 text-right font-bold text-slate-900">
-                  {challan.quantity} {challan.unit}
+                  {challan.quantity} {challan.unit || 'KG'}
                 </td>
               </tr>
             </tbody>

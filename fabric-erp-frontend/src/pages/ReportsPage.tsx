@@ -186,7 +186,7 @@ export const ReportsPage: React.FC = () => {
               <thead>
                 <tr className="border-b border-slate-100 text-[11px] font-semibold text-slate-400">
                   <th className="pb-3">Receipt No</th>
-                  <th className="pb-3">Batch</th>
+                  <th className="pb-3">Work Order</th>
                   <th className="pb-3">Process</th>
                   <th className="pb-3">Issued (KG)</th>
                   <th className="pb-3">Received (KG)</th>

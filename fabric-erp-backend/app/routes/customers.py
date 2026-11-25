@@ -1,3 +1,4 @@
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Dict, Any, List
 from app.core.database import get_database
@@ -18,9 +19,14 @@ async def create_customer(customer_in: CustomerCreate, current_user: Dict[str, A
     db = get_database()
     col = db.get_collection("customers")
     
-    code = customer_in.customer_code
+    code = (customer_in.customer_code or "").strip()
     if not code:
         code = await get_next_sequence("customer_code", prefix="CUS-")
+    else:
+        existing = await col.find_one({"customer_code": code})
+        if existing:
+            # If code is already taken, auto-assign next available sequence code
+            code = await get_next_sequence("customer_code", prefix="CUS-")
     
     doc = customer_in.model_dump()
     doc["customer_code"] = code
@@ -129,25 +135,62 @@ async def get_customer_history(customer_id: str, current_user: Dict[str, Any] = 
 async def set_customer_price(customer_id: str, payload: Dict[str, Any], current_user: Dict[str, Any] = Depends(get_current_user)):
     db = get_database()
     col = db.get_collection("customer_prices")
+    cust = await db.get_collection("customers").find_one({"_id": customer_id})
+    if not cust:
+        # Also check customer_code
+        cust = await db.get_collection("customers").find_one({"customer_code": customer_id})
+        if cust:
+            customer_id = cust["_id"]
+
+    raw_rate = payload.get("special_rate")
+    try:
+        if raw_rate is None or raw_rate == "":
+            rate = 0.0
+        else:
+            rate = float(raw_rate)
+    except (ValueError, TypeError):
+        rate = 0.0
+
+    fabric_name = (payload.get("fabric_name") or "Single Jersey").strip()
+    colour = (payload.get("colour") or "Standard").strip()
+
     doc = {
         "customer_id": customer_id,
-        "fabric_name": payload.get("fabric_name"),
+        "customer_name": cust.get("name") if cust else "",
+        "fabric_name": fabric_name,
         "gsm": payload.get("gsm"),
-        "colour": payload.get("colour"),
-        "special_rate": float(payload.get("special_rate", 0.0)),
+        "colour": colour,
+        "special_rate": rate,
         "updated_at": datetime.utcnow().isoformat()
     }
     await col.update_one(
-        {"customer_id": customer_id, "fabric_name": doc["fabric_name"], "colour": doc["colour"]},
+        {"customer_id": customer_id, "fabric_name": fabric_name, "colour": colour},
         {"$set": doc},
         upsert=True
     )
-    return {"message": "Customer price list updated successfully"}
+    cust_label = cust.get("name") if cust else customer_id
+    await log_audit("price_update", "customer_prices", customer_id, f"Saved rate ₹{rate}/KG for {cust_label} ({fabric_name} - {colour})", user=current_user.get("name"))
+    return {"message": "Customer price list updated successfully", "doc": doc}
+
+@router.delete("/{customer_id}/price-list/{price_id}")
+async def delete_customer_price(customer_id: str, price_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+    db = get_database()
+    col = db.get_collection("customer_prices")
+    res = await col.delete_one({"_id": price_id, "customer_id": customer_id})
+    if not res:
+        # Try matching by _id alone
+        res = await col.delete_one({"_id": price_id})
+    return {"message": "Customer price removed successfully"}
 
 @router.get("/{customer_id}/price-list")
 async def get_customer_price_list(customer_id: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     db = get_database()
     col = db.get_collection("customer_prices")
     prices = await (await col.find({"customer_id": customer_id})).to_list()
+    if not prices:
+        # Check by customer_code if id was code
+        cust = await db.get_collection("customers").find_one({"customer_code": customer_id})
+        if cust:
+            prices = await (await col.find({"customer_id": cust["_id"]})).to_list()
     return prices
 

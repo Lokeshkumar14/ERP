@@ -5,8 +5,9 @@ import { SalesOrdersPage } from './pages/SalesOrdersPage';
 import { YarnPurchasesPage } from './pages/YarnPurchasesPage';
 import { YarnInventoryPage } from './pages/YarnInventoryPage';
 import { JobWorkPage } from './pages/JobWorkPage';
+import { WorkOrdersPage } from './pages/WorkOrdersPage';
+import { JobOrdersPage } from './pages/JobOrdersPage';
 import { FabricRollsPage } from './pages/FabricRollsPage';
-import { QualityPage } from './pages/QualityPage';
 import { DeliveryChallansPage } from './pages/DeliveryChallansPage';
 import { DeliveriesPage } from './pages/DeliveriesPage';
 import { InvoicesPage } from './pages/InvoicesPage';
@@ -25,17 +26,16 @@ import { CreatePoModal } from './components/modals/CreatePoModal';
 import { CreateGrnModal } from './components/modals/CreateGrnModal';
 import { CreateJobOrderModal } from './components/modals/CreateJobOrderModal';
 import { ReceiveJobModal } from './components/modals/ReceiveJobModal';
-import { QualityInspectionModal } from './components/modals/QualityInspectionModal';
 import { CreateDcModal } from './components/modals/CreateDcModal';
 import { CreateInvoiceModal } from './components/modals/CreateInvoiceModal';
 import { RecordPaymentModal } from './components/modals/RecordPaymentModal';
 import { CreateCustomerModal } from './components/modals/CreateCustomerModal';
 import { CreatePartyModal } from './components/modals/CreatePartyModal';
+import { CreateBatchModal } from './components/modals/CreateBatchModal';
 
 // Printable Templates
 import { PrintableInvoice } from './components/printable/PrintableInvoice';
 import { PrintableChallan } from './components/printable/PrintableChallan';
-import { PrintableRollTag } from './components/printable/PrintableRollTag';
 
 export function App() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -43,12 +43,19 @@ export function App() {
 
   // Modal Open States
   const [createOrderOpen, setCreateOrderOpen] = useState(false);
+  const [createBatchOpen, setCreateBatchOpen] = useState(false);
+  const [selectedOrderForBatch, setSelectedOrderForBatch] = useState<any>(null);
+  const [selectedBatchForJobOrder, setSelectedBatchForJobOrder] = useState<any>(null);
   const [createPoOpen, setCreatePoOpen] = useState(false);
   const [createGrnOpen, setCreateGrnOpen] = useState(false);
   const [createJobOrderOpen, setCreateJobOrderOpen] = useState(false);
+  const [jobOrderInitialData, setJobOrderInitialData] = useState<{
+    batchId?: string;
+    processType?: string;
+    expectedQty?: number;
+  } | null>(null);
   const [receiveJobOpen, setReceiveJobOpen] = useState(false);
   const [selectedJobForReceipt, setSelectedJobForReceipt] = useState<any>(null);
-  const [qcModalOpen, setQcModalOpen] = useState(false);
   const [createDcOpen, setCreateDcOpen] = useState(false);
   const [createInvoiceOpen, setCreateInvoiceOpen] = useState(false);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
@@ -59,7 +66,6 @@ export function App() {
   // Printable states
   const [printableInvoice, setPrintableInvoice] = useState<any>(null);
   const [printableChallan, setPrintableChallan] = useState<any>(null);
-  const [printableRollTag, setPrintableRollTag] = useState<any>(null);
 
   const handleRefresh = () => {
     setRefreshKey((prev) => prev + 1);
@@ -70,14 +76,15 @@ export function App() {
       case 'sales_order':
         setCreateOrderOpen(true);
         break;
+      case 'batch':
+      case 'production_batch':
+        setCreateBatchOpen(true);
+        break;
       case 'yarn_po':
         setCreatePoOpen(true);
         break;
       case 'job_order':
         setCreateJobOrderOpen(true);
-        break;
-      case 'qc_inspection':
-        setQcModalOpen(true);
         break;
       case 'delivery_challan':
         setCreateDcOpen(true);
@@ -99,6 +106,10 @@ export function App() {
           <SalesOrdersPage
             key={refreshKey}
             onOpenCreateOrder={() => setCreateOrderOpen(true)}
+            onOpenCreateBatchForOrder={(order) => {
+              setSelectedOrderForBatch(order);
+              setCreateBatchOpen(true);
+            }}
             onPrintOrder={(o) => {
               // Create mock invoice object for printable invoice
               setPrintableInvoice({
@@ -142,11 +153,21 @@ export function App() {
         );
       case 'yarn_inventory':
         return <YarnInventoryPage key={refreshKey} />;
+      case 'work_orders':
       case 'job_work':
+      case 'job_orders':
         return (
-          <JobWorkPage
+          <WorkOrdersPage
             key={refreshKey}
-            onOpenIssueJob={() => setCreateJobOrderOpen(true)}
+            onOpenCreateBatch={() => setCreateBatchOpen(true)}
+            onOpenIssueJobForBatch={(batch, processType, readyQty) => {
+              setJobOrderInitialData({
+                batchId: batch._id,
+                processType: processType || batch.current_process,
+                expectedQty: readyQty || batch.planned_quantity,
+              });
+              setCreateJobOrderOpen(true);
+            }}
             onOpenReceiveJob={(job) => {
               setSelectedJobForReceipt(job);
               setReceiveJobOpen(true);
@@ -154,15 +175,7 @@ export function App() {
           />
         );
       case 'rolls':
-        return (
-          <FabricRollsPage
-            key={refreshKey}
-            onOpenCreateRoll={() => setCreateJobOrderOpen(true)}
-            onPrintRollTag={(roll) => setPrintableRollTag(roll)}
-          />
-        );
-      case 'quality':
-        return <QualityPage key={refreshKey} onOpenCreateInspection={() => setQcModalOpen(true)} />;
+        return <FabricRollsPage key={refreshKey} />;
       case 'challans':
         return (
           <DeliveryChallansPage
@@ -236,7 +249,13 @@ export function App() {
       />
       <CreateJobOrderModal
         isOpen={createJobOrderOpen}
-        onClose={() => setCreateJobOrderOpen(false)}
+        initialBatchId={jobOrderInitialData?.batchId}
+        initialProcessType={jobOrderInitialData?.processType}
+        initialExpectedQty={jobOrderInitialData?.expectedQty}
+        onClose={() => {
+          setCreateJobOrderOpen(false);
+          setJobOrderInitialData(null);
+        }}
         onSuccess={handleRefresh}
       />
       <ReceiveJobModal
@@ -245,11 +264,14 @@ export function App() {
           setReceiveJobOpen(false);
           setSelectedJobForReceipt(null);
         }}
-        onSuccess={handleRefresh}
-      />
-      <QualityInspectionModal
-        isOpen={qcModalOpen}
-        onClose={() => setQcModalOpen(false)}
+        onForwardToNextStage={(data) => {
+          setJobOrderInitialData({
+            batchId: data.batchId,
+            processType: data.processType,
+            expectedQty: data.expectedQty,
+          });
+          setCreateJobOrderOpen(true);
+        }}
         onSuccess={handleRefresh}
       />
       <CreateDcModal
@@ -278,6 +300,15 @@ export function App() {
         onClose={() => setCreatePartyOpen(false)}
         onSuccess={handleRefresh}
       />
+      <CreateBatchModal
+        isOpen={createBatchOpen}
+        initialOrder={selectedOrderForBatch}
+        onClose={() => {
+          setCreateBatchOpen(false);
+          setSelectedOrderForBatch(null);
+        }}
+        onSuccess={handleRefresh}
+      />
 
       {/* Printable Preview Modals */}
       {printableInvoice && (
@@ -290,12 +321,6 @@ export function App() {
         <PrintableChallan
           challan={printableChallan}
           onClose={() => setPrintableChallan(null)}
-        />
-      )}
-      {printableRollTag && (
-        <PrintableRollTag
-          roll={printableRollTag}
-          onClose={() => setPrintableRollTag(null)}
         />
       )}
     </MainLayout>

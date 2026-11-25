@@ -3,7 +3,6 @@ import { api } from '../api/client';
 import { KpiCard } from '../components/dashboard/KpiCard';
 import { ProductionTrendsChart } from '../components/dashboard/ProductionTrendsChart';
 import { InventoryDistributionChart } from '../components/dashboard/InventoryDistributionChart';
-import { QualityHeatmap } from '../components/dashboard/QualityHeatmap';
 import { InventoryStatusTable } from '../components/dashboard/InventoryStatusTable';
 import { OrderStatusList } from '../components/dashboard/OrderStatusList';
 import { SlidersHorizontal, RefreshCw, Layers, ArrowUpRight } from 'lucide-react';
@@ -99,8 +98,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         )}
       </div>
 
-      {/* Middle Row Charts matching reference image */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+      {/* Middle Row Charts */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {/* Production Trends Spline Chart */}
         <div className="lg:col-span-1">
           <ProductionTrendsChart data={production_trends} />
@@ -109,11 +108,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         {/* Inventory Distribution Bar Chart */}
         <div className="lg:col-span-1">
           <InventoryDistributionChart data={inventory_distribution} />
-        </div>
-
-        {/* Quality Control Heatmap */}
-        <div className="lg:col-span-1">
-          <QualityHeatmap data={qc_heatmap} />
         </div>
       </div>
 

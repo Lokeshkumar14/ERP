@@ -97,6 +97,19 @@ export interface SalesOrder {
   status: string;
   remarks?: string;
   created_at?: string;
+  planned_quantity?: number;
+  remaining_quantity?: number;
+  linked_work_orders?: Array<{
+    batch_id?: string;
+    batch_number: string;
+    fabric_name: string;
+    colour?: string;
+    gsm?: number;
+    planned_quantity: number;
+    completed_quantity?: number;
+    current_process?: string;
+    status?: string;
+  }>;
 }
 
 export interface PurchaseOrderItem {
@@ -123,6 +136,19 @@ export interface PurchaseOrder {
   status: string;
   remarks?: string;
   created_at?: string;
+  planned_quantity?: number;
+  remaining_quantity?: number;
+  linked_work_orders?: Array<{
+    batch_id?: string;
+    batch_number: string;
+    fabric_name: string;
+    colour?: string;
+    gsm?: number;
+    planned_quantity: number;
+    completed_quantity?: number;
+    current_process?: string;
+    status?: string;
+  }>;
 }
 
 export interface YarnLot {

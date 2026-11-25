@@ -25,10 +25,14 @@ async def create_party(party_in: PartyCreate, current_user: Dict[str, Any] = Dep
     db = get_database()
     col = db.get_collection("parties")
 
-    code = party_in.party_code
+    code = (party_in.party_code or "").strip()
+    prefix = "JW-" if "job_worker" in party_in.party_types else "SUP-"
     if not code:
-        prefix = "JW-" if "job_worker" in party_in.party_types else "SUP-"
         code = await get_next_sequence("party_code", prefix=prefix)
+    else:
+        existing = await col.find_one({"party_code": code})
+        if existing:
+            code = await get_next_sequence("party_code", prefix=prefix)
 
     doc = party_in.model_dump()
     doc["party_code"] = code

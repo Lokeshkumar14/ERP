@@ -7,12 +7,26 @@ interface CreateJobOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialBatchId?: string;
+  initialProcessType?: string;
+  initialExpectedQty?: number;
 }
+
+const DEFAULT_RATES: Record<string, number> = {
+  knitting: 14.5,
+  washing: 8.0,
+  compacting: 6.0,
+  dyeing: 35.0,
+  finishing: 5.0,
+};
 
 export const CreateJobOrderModal: React.FC<CreateJobOrderModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  initialBatchId,
+  initialProcessType,
+  initialExpectedQty,
 }) => {
   const [batches, setBatches] = useState<ProductionBatch[]>([]);
   const [workers, setWorkers] = useState<Party[]>([]);
@@ -38,19 +52,55 @@ export const CreateJobOrderModal: React.FC<CreateJobOrderModalProps> = ({
         setBatches(bList);
         setWorkers(wList);
         setYarnLots(yList);
-        if (bList.length > 0 && !batchId) setBatchId(bList[0]._id);
-        if (wList.length > 0 && !workerId) setWorkerId(wList[0]._id);
-        if (yList.length > 0 && !yarnLotNumber) setYarnLotNumber(yList[0].lot_number);
+
+        const targetBatchId = initialBatchId || (bList.length > 0 ? bList[0]._id : '');
+        setBatchId(targetBatchId);
+        const targetBatch = bList.find((b) => b._id === targetBatchId);
+
+        const chosenProc = initialProcessType || (targetBatch?.current_process || 'knitting');
+        setProcessType(chosenProc);
+        setRatePerKg(DEFAULT_RATES[chosenProc] || 10.0);
+
+        if (initialExpectedQty !== undefined && initialExpectedQty > 0) {
+          setExpectedQty(initialExpectedQty);
+          setYarnIssuedQty(Math.round(initialExpectedQty * 1.04));
+        } else if (targetBatch) {
+          setExpectedQty(targetBatch.planned_quantity || 500);
+          setYarnIssuedQty(Math.round((targetBatch.planned_quantity || 500) * 1.04));
+        }
+
+        // Try to match a worker who offers this service
+        const matchingWorker = wList.find((w) =>
+          w.services?.some((s: string) => s.toLowerCase().includes(chosenProc.toLowerCase()))
+        );
+        if (matchingWorker) {
+          setWorkerId(matchingWorker._id);
+        } else if (wList.length > 0) {
+          setWorkerId(wList[0]._id);
+        }
+
+        if (yList.length > 0) setYarnLotNumber(yList[0].lot_number);
       });
     }
-  }, [isOpen]);
+  }, [isOpen, initialBatchId, initialProcessType, initialExpectedQty]);
+
+  const handleProcessChange = (newProc: string) => {
+    setProcessType(newProc);
+    setRatePerKg(DEFAULT_RATES[newProc] || 10.0);
+    // Find matching worker
+    const match = workers.find((w) =>
+      w.services?.some((s) => s.toLowerCase().includes(newProc.toLowerCase()))
+    );
+    if (match) setWorkerId(match._id);
+  };
+
+  const selectedBatch = batches.find((b) => b._id === batchId);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const selectedBatch = batches.find((b) => b._id === batchId);
       const selectedWorker = workers.find((w) => w._id === workerId);
 
       await api.createJobOrder({
@@ -88,7 +138,7 @@ export const CreateJobOrderModal: React.FC<CreateJobOrderModalProps> = ({
 
         <div className="space-y-3 text-xs">
           <div>
-            <label className="font-semibold text-slate-700 block mb-1">Production Batch</label>
+            <label className="font-semibold text-slate-700 block mb-1">Production Work Order</label>
             <select
               required
               value={batchId}
@@ -108,7 +158,7 @@ export const CreateJobOrderModal: React.FC<CreateJobOrderModalProps> = ({
               <label className="font-semibold text-slate-700 block mb-1">Process Type</label>
               <select
                 value={processType}
-                onChange={(e) => setProcessType(e.target.value)}
+                onChange={(e) => handleProcessChange(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 p-2 text-xs capitalize focus:border-indigo-500 focus:outline-none"
               >
                 <option value="knitting">Knitting</option>
@@ -135,6 +185,20 @@ export const CreateJobOrderModal: React.FC<CreateJobOrderModalProps> = ({
               </select>
             </div>
           </div>
+
+          {processType !== 'knitting' && selectedBatch && (
+            <div className="rounded-xl bg-blue-50/70 p-3 border border-blue-100 flex items-center justify-between text-xs">
+              <div>
+                <span className="font-bold text-blue-900 block">Input Fabric for {processType.toUpperCase()}</span>
+                <span className="text-[11px] text-blue-700">
+                  {selectedBatch.fabric_name} · {selectedBatch.colour} ({selectedBatch.gsm} GSM)
+                </span>
+              </div>
+              <span className="px-2.5 py-1 rounded-lg bg-blue-100 font-bold text-blue-800 text-[11px]">
+                {expectedQty} KG Lot
+              </span>
+            </div>
+          )}
 
           {processType === 'knitting' && (
             <div className="grid grid-cols-2 gap-3 rounded-xl bg-purple-50/50 p-3 border border-purple-100">
